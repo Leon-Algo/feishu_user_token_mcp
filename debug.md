@@ -396,5 +396,37 @@ uv sync
 | Docker构建 | `project.license` as a TOML table is deprecated` | 修复 pyproject.toml 许可证格式 |
 | 运行时 | `'SmitheryFastMCP' object is not callable` | 使用 streamable_http_app |
 | 扫描失败 | `couldn't connect to your server to scan for tools` | 配置测试凭证 |
+| MCP工具执行 | `Failed to refresh app token: invalid param` | 添加参数验证和调试日志 |
+
+## 问题 6: 生产环境 MCP 工具执行失败 (2025-09-25)
+
+**现象:**
+- 服务器成功部署到 Smithery 平台
+- MCP 工具调用时返回错误: `Error executing tool get_feishu_app_token: Failed to get app token: Failed to refresh app token: invalid param`
+
+**分析:**
+1. 本地测试使用相同凭据成功获取 app token
+2. 问题可能在于生产环境的参数传递或验证
+3. 需要添加调试日志来诊断具体问题
+
+**解决方案:**
+1. **添加详细的调试日志和参数验证** - 在 `refresh_app_token` 方法中添加:
+   - 参数空值检查和验证
+   - 详细的请求和响应日志记录
+   - 去除参数前后空格处理
+
+2. **添加配置调试信息** - 在 MCP 工具中添加:
+   - session_config 类型和值的调试输出
+   - 参数传递状态的验证
+
+**修复后的代码关键点:**
+- 参数验证: 检查 app_id 和 app_secret 是否为空
+- 去空格处理: 使用 `.strip()` 清理参数
+- 详细日志: 记录请求URL、payload、响应状态和数据
+- 错误信息增强: 提供更详细的错误码和消息
+
+**测试验证:**
+- 本地测试通过，成功获取 app token: `t-g1049p02ILAWXVG7AGRZYE7EFIQCSSAYUEG7HEGT`
+- 需要重新部署到 Smithery 平台验证修复
 
 通过遵循以上步骤和最佳实践，应该能够成功部署到 Smithery 远程平台并通过工具扫描。

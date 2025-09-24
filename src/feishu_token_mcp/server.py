@@ -38,27 +38,47 @@ class FeishuTokenManager:
         """
         Gets the app access token using app_id and app_secret.
         """
+        # 添加参数验证和调试日志
+        if not self.app_id or not self.app_secret:
+            return False, f"Missing credentials: app_id={bool(self.app_id)}, app_secret={bool(self.app_secret)}"
+        
+        if not self.app_id.strip() or not self.app_secret.strip():
+            return False, f"Empty credentials: app_id='{self.app_id}', app_secret length={len(self.app_secret)}"
+        
         headers = {
             "Content-Type": "application/json; charset=utf-8"
         }
         payload = {
-            "app_id": self.app_id,
-            "app_secret": self.app_secret
+            "app_id": self.app_id.strip(),
+            "app_secret": self.app_secret.strip()
         }
+        
+        print(f"[DEBUG] Requesting app token with app_id: {self.app_id[:8]}...")
+        print(f"[DEBUG] Request URL: {FEISHU_APP_TOKEN_URL}")
+        print(f"[DEBUG] Request payload: {{'app_id': '{self.app_id[:8]}...', 'app_secret': '[HIDDEN]'}}")
         
         try:
             response = requests.post(FEISHU_APP_TOKEN_URL, headers=headers, json=payload)
+            print(f"[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response headers: {dict(response.headers)}")
+            
             response.raise_for_status()
             
             data = response.json()
+            print(f"[DEBUG] Response data: {data}")
+            
             if data.get("code") == 0:
                 self.app_access_token = data.get("app_access_token")
                 # Set expiration time with a 5-minute buffer
                 self.expires_at = time.time() + data.get("expire", 0) - 300
+                print(f"[DEBUG] Successfully obtained app token, expires at: {self.expires_at}")
                 return True, None
             else:
-                return False, data.get("msg", "Unknown error")
+                error_msg = data.get("msg", "Unknown error")
+                print(f"[DEBUG] API returned error: code={data.get('code')}, msg={error_msg}")
+                return False, f"API error (code {data.get('code')}): {error_msg}"
         except requests.exceptions.RequestException as e:
+            print(f"[DEBUG] Request exception: {type(e).__name__}: {e}")
             return False, str(e)
 
     def get_app_token(self):
@@ -150,6 +170,11 @@ def create_server():
         """
         session_config = ctx.session_config
         
+        # 调试配置信息
+        print(f"[DEBUG] Session config type: {type(session_config)}")
+        print(f"[DEBUG] Session config app_id: {getattr(session_config, 'app_id', 'NOT_FOUND')[:8] if hasattr(session_config, 'app_id') and getattr(session_config, 'app_id') else 'NOT_FOUND'}...")
+        print(f"[DEBUG] Session config app_secret exists: {hasattr(session_config, 'app_secret') and bool(getattr(session_config, 'app_secret', ''))}")
+        
         # Get the token manager instance for the current session
         manager = get_token_manager(
             app_id=session_config.app_id,
@@ -163,6 +188,7 @@ def create_server():
                 "expires_at": manager.expires_at
             }
         except Exception as e:
+            print(f"[DEBUG] Exception in get_feishu_app_token: {type(e).__name__}: {e}")
             raise Exception(f"Failed to get app token: {str(e)}")
 
     # Add a tool to refresh Feishu user token
