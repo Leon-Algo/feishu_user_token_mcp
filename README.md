@@ -158,6 +158,15 @@ npx @smithery/cli playground --port 8081
 - **Redis**：一个快速的内存数据存储，非常适合缓存令牌。
 - **数据库**：如 PostgreSQL 或 MySQL。
 
+## 故障排查
+
+如果在开发或部署过程中遇到问题，请查看 [debug.md](./debug.md) 文件，其中包含了详细的故障排查指南，包括：
+
+- Smithery Playground 启动问题
+- Docker 构建和部署问题
+- ASGI 应用程序配置问题
+- 远程部署到 Smithery 平台的常见问题
+
 ## 部署到 Smithery
 
 准备好部署了吗？将您的代码推送到 GitHub 并部署到 Smithery：

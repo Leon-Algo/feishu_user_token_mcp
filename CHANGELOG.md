@@ -1,5 +1,30 @@
 # 变更日志
 
+## [1.0.1] - 2025-09-24
+
+### 问题修复
+
+#### Docker 部署问题修复
+- **修复**: 修复了 `.dockerignore` 文件排除 `README.md` 导致的构建失败问题
+- **修复**: 更新 `pyproject.toml` 中的许可证格式，从已弃用的表格格式改为字符串格式
+- **修复**: 移除了 `setuptools-scm` 依赖，避免缺少配置导致的构建错误
+- **优化**: 重新组织 Dockerfile 结构，优化构建缓存和文件复制顺序
+
+#### ASGI 应用程序配置修复
+- **修复**: 解决了 `TypeError: 'SmitheryFastMCP' object is not callable` 错误
+- **技术细节**: 修复了启动脚本，使用 `server._fastmcp.streamable_http_app` 作为 ASGI 应用
+- **验证**: 确保 ASGI 应用程序的可调用性，兼容 uvicorn 服务器
+
+### 文档更新
+- **新增**: 创建了 `DEPLOYMENT_ISSUES.md` 文档，详细记录部署问题和解决方案
+- **更新**: 扩展了 `debug.md` 文档，添加了 Smithery 远程部署问题解决指南
+- **更新**: 在 `README.md` 中添加了故障排查章节的链接
+
+### 验证测试
+- **本地测试**: ✅ 包构建和服务器启动正常
+- **Docker 测试**: ✅ Docker 构建和容器运行成功
+- **ASGI 验证**: ✅ StreamableHTTP 会话管理器正常启动
+
 ## [1.0.0] - 2025-09-24
 
 ### 新增功能

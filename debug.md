@@ -193,3 +193,208 @@ uv run playground
 增强错误处理逻辑，提供更详细的错误信息和恢复机制。
 
 通过遵循以上步骤，应该能够成功启动 Smithery playground 并进行开发测试。
+
+---
+
+# Smithery 远程部署问题解决指南
+
+## 问题描述
+
+在成功进行本地开发和测试后，部署到 Smithery 远程平台时遇到以下错误：
+
+### 错误1：Docker 构建失败 - 包结构问题
+
+```bash
+× Failed to build `feishu-token-mcp @ file:///app`
+├─▶ The build backend returned an error
+╰─▶ Call to `setuptools.build_meta.build_editable` failed (exit status: 1)
+
+[stderr]
+SetuptoolsWarning: File '/app/README.md' cannot be found
+SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+error: error in 'egg_base' option: 'src' does not exist or is not a directory
+```
+
+### 错误2：运行时 ASGI 应用程序错误
+
+```bash
+ERROR:    Exception in ASGI application
+TypeError: 'SmitheryFastMCP' object is not callable
+```
+
+## 详细问题分析与解决方案
+
+### 问题1：Docker 构建配置问题
+
+#### 根本原因：
+1. **`.dockerignore` 配置错误**：README.md 被排除，但 `pyproject.toml` 引用了它
+2. **`pyproject.toml` 许可证格式问题**：使用了已弃用的表格格式
+3. **setuptools-scm 配置缺失**：包含了依赖但缺少配置
+4. **文件复制时序问题**：在复制源码前尝试构建包
+
+#### 解决方案：
+
+**1. 修复 `.dockerignore` 文件：**
+```diff
+# Documentation (keep README.md as it's referenced in pyproject.toml)
+- README.md
+CHANGELOG.md
+debug.md
+PATH_debug.md
+AGENTS.md
+```
+
+**2. 修复 `pyproject.toml` 配置：**
+```diff
+[build-system]
+- requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
++ requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "feishu-token-mcp"
+version = "1.0.0"
+description = "A Model Context Protocol server for managing and automatically refreshing Feishu app and user access tokens"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+- license = {text = "MIT"}
++ license = "MIT"
+requires-python = ">=3.12"
+```
+
+**3. 优化 Dockerfile 结构：**
+```dockerfile
+# Use Python 3.12 slim base image
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Copy project files
+COPY . .
+
+# Install dependencies and the package
+RUN uv sync --frozen --no-dev
+```
+
+### 问题2：ASGI 应用程序调用错误
+
+#### 根本原因：
+`SmitheryFastMCP` 对象本身不是可调用的 ASGI 应用程序。uvicorn 需要的是其内部的 `streamable_http_app` 属性。
+
+#### 技术分析：
+- `create_server()` 返回 `SmitheryFastMCP` 对象
+- `SmitheryFastMCP` 包装了 `FastMCP` 实例 (`_fastmcp` 属性)
+- `FastMCP` 实例有 `streamable_http_app` 属性，这才是真正的 ASGI 应用
+
+#### 解决方案：
+
+**修复 Dockerfile 中的启动脚本：**
+```diff
+# Create startup script that starts the MCP server
+RUN echo '#!/bin/bash\nset -e\nPORT=${PORT:-8080}\necho "Starting Feishu Token MCP server on port $PORT"\n
+- exec uv run python -c "from feishu_token_mcp.server import create_server; import uvicorn; server = create_server(); uvicorn.run(server, host=\\"0.0.0.0\\", port=int(\\"$PORT\\"))"' > /app/start.sh && \
++ exec uv run python -c "from feishu_token_mcp.server import create_server; import uvicorn; server = create_server(); app = server._fastmcp.streamable_http_app; uvicorn.run(app, host=\\"0.0.0.0\\", port=int(\\"$PORT\\"))"' > /app/start.sh && \
+    chmod +x /app/start.sh
+```
+
+### 验证步骤
+
+#### 1. 本地验证 ASGI 应用：
+```bash
+uv run python -c "from feishu_token_mcp.server import create_server; server = create_server(); print('streamable_http_app type:', type(server._fastmcp.streamable_http_app)); print('streamable_http_app callable:', callable(server._fastmcp.streamable_http_app))"
+```
+
+预期输出：
+```
+streamable_http_app type: <class 'function'>
+streamable_http_app callable: True
+```
+
+#### 2. 本地 Docker 构建测试：
+```bash
+docker build -t feishu-token-mcp-test .
+```
+
+#### 3. 本地 Docker 运行测试：
+```bash
+docker run -d -p 8083:8080 --name feishu-test -e PORT=8080 feishu-token-mcp-test
+docker logs feishu-test
+```
+
+预期日志：
+```
+Starting Feishu Token MCP server on port 8080
+WARNING:  ASGI app factory detected. Using it, but please consider setting the --factory flag explicitly.
+INFO:     Started server process [43]
+INFO:     Waiting for application startup.
+INFO:     StreamableHTTP session manager started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+```
+
+#### 4. 本地服务器功能测试：
+```bash
+uv run python -c "from feishu_token_mcp.server import create_server; import uvicorn; server = create_server(); app = server._fastmcp.streamable_http_app; uvicorn.run(app, host='0.0.0.0', port=8082)"
+```
+
+## 部署后的扫描失败问题
+
+### 问题描述：
+```
+Scan Failed
+Your deployment succeeded, but we couldn't connect to your server to scan for tools.
+```
+
+### 解决方案：
+1. **配置测试配置文件**：在 Smithery 平台上设置测试配置，包含有效的 `app_id` 和 `app_secret`
+2. **验证服务器响应**：确保服务器能正确响应 MCP 初始化请求
+
+## 最佳实践总结
+
+### 1. Docker 构建最佳实践：
+- 确保 `.dockerignore` 不排除 `pyproject.toml` 引用的文件
+- 使用现代的 `pyproject.toml` 配置格式
+- 避免不必要的 setuptools 扩展依赖
+
+### 2. Smithery/FastMCP 集成最佳实践：
+- 使用 `server._fastmcp.streamable_http_app` 作为 ASGI 应用
+- 确保正确处理 `SmitheryFastMCP` 对象结构
+- 在 uvicorn 启动前验证 ASGI 应用的可调用性
+
+### 3. 部署验证流程：
+1. 本地构建和测试
+2. 本地 Docker 构建验证
+3. 本地 Docker 运行测试
+4. 推送到远程仓库
+5. 在 Smithery 平台部署
+6. 配置测试凭证进行工具扫描
+
+### 4. 故障排查工具：
+```bash
+# 检查对象结构
+uv run python -c "from feishu_token_mcp.server import create_server; server = create_server(); print(dir(server)); print(dir(server._fastmcp))"
+
+# 验证 ASGI 应用
+uv run python -c "from feishu_token_mcp.server import create_server; server = create_server(); app = server._fastmcp.streamable_http_app; print('Ready:', callable(app))"
+
+# 本地包构建测试
+uv sync
+```
+
+## 常见错误代码对照
+
+| 错误类型 | 错误信息 | 解决方案编号 |
+|---------|----------|--------------|
+| Docker构建 | `'src' does not exist or is not a directory` | 修复 pyproject.toml + Dockerfile |
+| Docker构建 | `File '/app/README.md' cannot be found` | 修复 .dockerignore |
+| Docker构建 | `project.license` as a TOML table is deprecated` | 修复 pyproject.toml 许可证格式 |
+| 运行时 | `'SmitheryFastMCP' object is not callable` | 使用 streamable_http_app |
+| 扫描失败 | `couldn't connect to your server to scan for tools` | 配置测试凭证 |
+
+通过遵循以上步骤和最佳实践，应该能够成功部署到 Smithery 远程平台并通过工具扫描。
