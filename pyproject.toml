@@ -27,4 +27,4 @@ playground = "smithery.cli.playground:main"
 
 [tool.smithery]
 # Function that returns a patched FastMCP server
-server = "hello_server.server:create_server"
+server = "feishu_token_mcp.server:create_server"
