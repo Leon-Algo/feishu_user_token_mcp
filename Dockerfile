@@ -19,8 +19,8 @@ COPY . .
 # Create the package in the environment
 RUN uv sync --frozen --no-dev
 
-# Create startup script
-RUN echo '#!/bin/bash\nset -e\nPORT=${PORT:-8080}\necho "Starting Feishu Token MCP server on port $PORT"\nexec uv run smithery.cli.dev:main --host 0.0.0.0 --port $PORT --transport shttp' > /app/start.sh && \
+# Create startup script that starts the MCP server using the FastMCP server directly
+RUN echo '#!/bin/bash\nset -e\nPORT=${PORT:-8080}\necho "Starting Feishu Token MCP server on port $PORT"\nexec uv run python -c "from feishu_token_mcp.server import create_server; import uvicorn; server = create_server(); uvicorn.run(server, host=\\"0.0.0.0\\", port=int(\\"$PORT\\"))"' > /app/start.sh && \
     chmod +x /app/start.sh
 
 # Expose default port (Smithery will override with PORT env var)

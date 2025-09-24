@@ -1,6 +1,6 @@
 [build-system]
-requires = ["uv_build>=0.8.15,<0.9.0"]
-build-backend = "uv_build"
+requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "feishu-token-mcp"
@@ -10,14 +10,22 @@ authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
     "mcp>=1.14.0",
     "smithery>=0.2.4",
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
+    "uvicorn>=0.24.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["feishu_token_mcp*"]
+
+[tool.setuptools.package-dir]
+"" = "src"
 
 [tool.smithery]
 # Function that returns a patched FastMCP server
