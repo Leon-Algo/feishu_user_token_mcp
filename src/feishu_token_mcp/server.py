@@ -159,38 +159,6 @@ def create_server():
     server.description = "A server to manage and refresh Feishu app and user access tokens."
     server.version = "1.0.0"
 
-    # Add a tool to get Feishu app token
-    @server.tool()
-    def get_feishu_app_token(ctx: Context) -> dict:
-        """
-        Provides a valid Feishu app access token. 
-        If the existing token is expired or invalid, it will be refreshed automatically.
-        The necessary app_id and app_secret are retrieved from the session configuration.
-        Returns the app_access_token and expiration information.
-        """
-        session_config = ctx.session_config
-        
-        # 调试配置信息
-        print(f"[DEBUG] Session config type: {type(session_config)}")
-        print(f"[DEBUG] Session config app_id: {getattr(session_config, 'app_id', 'NOT_FOUND')[:8] if hasattr(session_config, 'app_id') and getattr(session_config, 'app_id') else 'NOT_FOUND'}...")
-        print(f"[DEBUG] Session config app_secret exists: {hasattr(session_config, 'app_secret') and bool(getattr(session_config, 'app_secret', ''))}")
-        
-        # Get the token manager instance for the current session
-        manager = get_token_manager(
-            app_id=session_config.app_id,
-            app_secret=session_config.app_secret
-        )
-        
-        try:
-            app_token = manager.get_app_token()
-            return {
-                "app_access_token": app_token,
-                "expires_at": manager.expires_at
-            }
-        except Exception as e:
-            print(f"[DEBUG] Exception in get_feishu_app_token: {type(e).__name__}: {e}")
-            raise Exception(f"Failed to get app token: {str(e)}")
-
     # Add a tool to refresh Feishu user token
     @server.tool()
     def refresh_feishu_user_token(refresh_token: str, ctx: Context) -> dict:
@@ -219,11 +187,10 @@ def create_server():
 
     # Add a tool to get Feishu app token with direct parameters
     @server.tool()
-    def get_feishu_app_token_direct(app_id: str, app_secret: str) -> dict:
+    def get_feishu_app_token(app_id: str, app_secret: str) -> dict:
         """
         Provides a valid Feishu app access token using provided app_id and app_secret.
         If the existing token is expired or invalid, it will be refreshed automatically.
-        This is a direct version that accepts credentials as parameters instead of from session config.
         
         Args:
             app_id: The App ID of your Feishu application
@@ -232,8 +199,8 @@ def create_server():
         Returns:
             A dictionary containing the app_access_token and expiration information
         """
-        print(f"[DEBUG] Direct tool called with app_id: {app_id[:8]}...")
-        print(f"[DEBUG] Direct tool called with app_secret length: {len(app_secret)}")
+        print(f"[DEBUG] Tool called with app_id: {app_id[:8]}...")
+        print(f"[DEBUG] Tool called with app_secret length: {len(app_secret)}")
         
         # Get the token manager instance
         manager = get_token_manager(app_id=app_id, app_secret=app_secret)
@@ -247,7 +214,7 @@ def create_server():
                 "message": "Successfully obtained app token"
             }
         except Exception as e:
-            print(f"[DEBUG] Exception in get_feishu_app_token_direct: {type(e).__name__}: {e}")
+            print(f"[DEBUG] Exception in get_feishu_app_token: {type(e).__name__}: {e}")
             raise Exception(f"Failed to get app token: {str(e)}")
 
     return server
