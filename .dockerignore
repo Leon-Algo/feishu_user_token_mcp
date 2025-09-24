@@ -23,8 +23,7 @@ Thumbs.db
 .git/
 .gitignore
 
-# Documentation
-README.md
+# Documentation (keep README.md as it's referenced in pyproject.toml)
 CHANGELOG.md
 debug.md
 PATH_debug.md
