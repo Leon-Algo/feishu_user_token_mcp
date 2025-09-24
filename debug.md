@@ -96,6 +96,20 @@ npm error code EPERM
 ### 问题3：环境变量未更新
 **解决方案**：手动将 npm 全局 bin 目录添加到 PATH 环境变量中
 
+### 问题4：浏览器显示 "Connection Error - Failed to fetch"
+**原因**：MCP 服务器未运行，playground 无法连接到本地服务器
+**解决方案**：
+1. 在第一个终端中启动 MCP 服务器：
+   ```powershell
+   uv run dev --port 8081
+   ```
+2. 在第二个终端中启动 playground：
+   ```powershell
+   npx @smithery/cli playground --port 8081
+   ```
+3. 确保两个进程同时运行，不要关闭任何一个
+4. 在 playground 中配置会话参数（app_id, app_secret）
+
 ## 预防措施
 
 1. 定期检查和更新环境变量配置
