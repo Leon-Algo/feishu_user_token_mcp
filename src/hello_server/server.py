@@ -1,7 +1,7 @@
 """
 Feishu Access Token Manager for MCP
 
-This server provides a tool to manage and automatically refresh Feishu app access tokens.
+This server provides tools to manage and automatically refresh Feishu app and user access tokens.
 """
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -24,6 +24,7 @@ class ConfigSchema(BaseModel):
 
 # Feishu API endpoints
 FEISHU_APP_TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal"
+FEISHU_USER_TOKEN_REFRESH_URL = "https://open.feishu.cn/open-apis/authen/v1/refresh_access_token"
 
 
 class FeishuTokenManager:
@@ -51,8 +52,7 @@ class FeishuTokenManager:
             
             data = response.json()
             if data.get("code") == 0:
-                token_data = data.get("app_access_token")
-                self.app_access_token = token_data
+                self.app_access_token = data.get("app_access_token")
                 # Set expiration time with a 5-minute buffer
                 self.expires_at = time.time() + data.get("expire", 0) - 300
                 return True, None
@@ -61,20 +61,54 @@ class FeishuTokenManager:
         except requests.exceptions.RequestException as e:
             return False, str(e)
 
-    def get_token_info(self):
+    def get_app_token(self):
         """
-        Returns the current app access token information. If the token is expired or about to expire,
+        Returns the current app access token. If the token is expired or about to expire,
         it refreshes it first.
         """
-        if time.time() >= self.expires_at:
+        if not self.app_access_token or time.time() >= self.expires_at:
             success, error_msg = self.refresh_app_token()
             if not success:
-                return None, error_msg
+                raise Exception(f"Failed to refresh app token: {error_msg}")
 
-        return {
-            "app_access_token": self.app_access_token,
-            "expires_at": self.expires_at
-        }, None
+        return self.app_access_token
+
+    def refresh_user_token(self, refresh_token: str):
+        """
+        Refreshes the user access token using the refresh token.
+        """
+        # First get a valid app token
+        app_token = self.get_app_token()
+        
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {app_token}"
+        }
+        payload = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": self.app_id,
+            "client_secret": self.app_secret
+        }
+        
+        try:
+            response = requests.post(FEISHU_USER_TOKEN_REFRESH_URL, headers=headers, json=payload)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get("code") == 0:
+                token_data = data.get("data", {})
+                return {
+                    "access_token": token_data.get("access_token"),
+                    "refresh_token": token_data.get("refresh_token"),
+                    "expires_in": token_data.get("expires_in"),
+                    "token_type": token_data.get("token_type"),
+                    "scope": token_data.get("scope")
+                }, None
+            else:
+                return None, f"API error: {data.get('msg', 'Unknown error')}"
+        except requests.exceptions.RequestException as e:
+            return None, str(e)
 
 
 # In-memory cache for token managers (one per app_id)
@@ -102,17 +136,17 @@ def create_server():
     
     # Create your FastMCP server as usual
     server = FastMCP("Feishu Token Manager")
-    server.description = "A server to manage and refresh Feishu app access tokens."
+    server.description = "A server to manage and refresh Feishu app and user access tokens."
     server.version = "1.0.0"
 
-    # Add a tool to get Feishu token
+    # Add a tool to get Feishu app token
     @server.tool()
-    def get_feishu_token(ctx: Context) -> dict:
+    def get_feishu_app_token(ctx: Context) -> dict:
         """
         Provides a valid Feishu app access token. 
         If the existing token is expired or invalid, it will be refreshed automatically.
         The necessary app_id and app_secret are retrieved from the session configuration.
-        Returns a dictionary containing the app_access_token and expiration timestamp.
+        Returns the app_access_token and expiration information.
         """
         session_config = ctx.session_config
         
@@ -122,10 +156,35 @@ def create_server():
             app_secret=session_config.app_secret
         )
         
-        token_info, error = manager.get_token_info()
+        try:
+            app_token = manager.get_app_token()
+            return {
+                "app_access_token": app_token,
+                "expires_at": manager.expires_at
+            }
+        except Exception as e:
+            raise Exception(f"Failed to get app token: {str(e)}")
+
+    # Add a tool to refresh Feishu user token
+    @server.tool()
+    def refresh_feishu_user_token(refresh_token: str, ctx: Context) -> dict:
+        """
+        Refreshes a Feishu user access token using the provided refresh token.
+        The app_id and app_secret are retrieved from the session configuration.
+        Returns the new access token, refresh token, and expiration information.
+        """
+        session_config = ctx.session_config
+        
+        # Get the token manager instance for the current session
+        manager = get_token_manager(
+            app_id=session_config.app_id,
+            app_secret=session_config.app_secret
+        )
+        
+        token_info, error = manager.refresh_user_token(refresh_token)
         
         if error:
-            raise Exception(f"Failed to refresh token: {error}")
+            raise Exception(f"Failed to refresh user token: {error}")
             
         if not token_info:
             raise Exception("Failed to retrieve token information.")
