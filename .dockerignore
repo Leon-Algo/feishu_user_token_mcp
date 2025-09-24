@@ -1,0 +1,45 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+CHANGELOG.md
+debug.md
+PATH_debug.md
+AGENTS.md
+
+# Test files
+*test*.py
+test_*
+tests/
+
+# Environment files (will be handled via config)
+.env
+.env.*
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

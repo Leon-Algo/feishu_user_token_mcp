@@ -1,1 +1,21 @@
-runtime: python
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    required: ["app_id", "app_secret"]
+    properties:
+      app_id:
+        type: "string"
+        title: "Feishu App ID"
+        description: "The App ID of your Feishu application"
+      app_secret:
+        type: "string"
+        title: "Feishu App Secret"
+        description: "The App Secret of your Feishu application"
+  exampleConfig:
+    app_id: "cli_xxxxxxxxxxxxxxxx"
+    app_secret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"

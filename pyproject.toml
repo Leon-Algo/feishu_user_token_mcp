@@ -19,12 +19,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
-[project.scripts]
-# Run the MCP server in development mode
-dev = "smithery.cli.dev:main"
-# Run server with interactive testing playground
-playground = "smithery.cli.playground:main"
-
 [tool.smithery]
 # Function that returns a patched FastMCP server
 server = "feishu_token_mcp.server:create_server"
